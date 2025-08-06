@@ -5,10 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Escanear Artículos - Almacén Dulces</title>
 
-  <!-- XLSX para exportar a Excel -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -27,6 +25,7 @@
 
     const inputCodigo = document.getElementById("codigo");
     const inputCantidad = document.getElementById("cantidad");
+    const inputClave = document.getElementById("palabraClave");
     const tabla = document.getElementById("tabla-productos");
     const exportarBtn = document.getElementById("exportar");
     const guardarBtn = document.getElementById("guardar");
@@ -35,16 +34,16 @@
     const select = document.getElementById("select-folio");
 
     let articulosEscaneados = [];
-  let folio = generarFolio();  // ← genera el folio desde el inicio con palabra clave si la hay
-folioSpan.textContent = folio;
+    let folio = generarFolio();
+    folioSpan.textContent = folio;
 
-function generarFolio() {
-  const fecha = new Date();
-  let base = `INVT-DULCES-${fecha.toISOString().slice(0,10).replace(/-/g, '')}-${fecha.getHours()}${fecha.getMinutes()}${fecha.getSeconds()}`;
-  const clave = document.getElementById("palabraClave")?.value.trim();
-  if (clave) base += `-${clave.replace(/\s+/g, "_").toUpperCase()}`;
-  return base;
-}
+    function generarFolio() {
+      const fecha = new Date();
+      let base = `INVT-DULCES-${fecha.toISOString().slice(0,10).replace(/-/g, '')}-${fecha.getHours()}${fecha.getMinutes()}${fecha.getSeconds()}`;
+      const clave = inputClave?.value.trim();
+      if (clave) base += `-${clave.replace(/\s+/g, "_").toUpperCase()}`;
+      return base;
+    }
 
     inputCodigo.addEventListener("keypress", async (e) => {
       if (e.key === "Enter") {
@@ -110,11 +109,11 @@ function generarFolio() {
         return;
       }
 
-     folio = generarFolio();
-folioSpan.textContent = folio;
+      folio = generarFolio();
+      folioSpan.textContent = folio;
 
-const grupo = {
-  folio: folio,
+      const grupo = {
+        folio: folio,
         fecha: new Date().toISOString(),
         articulos: articulosEscaneados,
         totalArticulos: articulosEscaneados.length
@@ -124,17 +123,17 @@ const grupo = {
         await addDoc(collection(db, "almacenes/Almacen_Dulces/inventarios"), grupo);
         alert(`✅ Inventario guardado con folio: ${folio}`);
 
-        // Limpiar todo
+        // Limpiar después de guardar
         articulosEscaneados = [];
         actualizarTabla();
         folio = generarFolio();
         folioSpan.textContent = folio;
         inputCodigo.value = "";
         inputCantidad.value = "1";
+        inputClave.value = "";
       } catch (e) {
         console.error("Error al guardar:", e);
         alert("❌ Error al guardar el inventario.");
-        document.getElementById("palabraClave").value = "";
       }
     });
 
@@ -144,8 +143,8 @@ const grupo = {
 
       const snapshot = await getDocs(collection(db, "almacenes/Almacen_Dulces/inventarios"));
       select.innerHTML = `<option value="">Selecciona un folio</option>`;
-
       window.foliosMap = {};
+
       snapshot.forEach(doc => {
         const data = doc.data();
         if (data.folio) {
@@ -166,14 +165,15 @@ const grupo = {
         return;
       }
 
-      const encabezados = [["#", "Descripción", "Código", "Cantidad", "Precio", "Fecha"]];
+      const encabezados = [["#", "Descripción", "Código", "Cantidad", "Precio", "Fecha", "Folio"]];
       const datos = grupo.articulos.map((p, i) => [
         i + 1,
         p.descripcion,
         p.codigo,
         p.cantidad,
         p.precio,
-        p.timestamp?.slice(0, 10) || ""
+        p.timestamp?.slice(0, 10) || "",
+        grupo.folio
       ]);
 
       const contenido = encabezados.concat(datos);
@@ -210,10 +210,6 @@ const grupo = {
       color: white;
       padding: 20px;
       min-height: 100vh;
-    }
-
-    h1 {
-      margin-bottom: 10px;
     }
 
     input, button {
@@ -280,7 +276,6 @@ const grupo = {
       cursor: pointer;
     }
 
-    /* Modal */
     #modal-folios {
       display: none;
       position: fixed;
@@ -305,10 +300,9 @@ const grupo = {
   <h1>Escanear Artículos - Almacén Dulces</h1>
 
   <div>Folio actual: <span class="folio-box" id="folio"></span></div>
-  <div style="margin-bottom:10px;">
+
   <label for="palabraClave">Palabra clave (opcional):</label>
-  <input type="text" id="palabraClave" placeholder="Ej. BODEGA, PROV, URGENTE">
-</div>
+  <input type="text" id="palabraClave" placeholder="Ej. BODEGA, URGENTE, PROV">
 
   <input type="text" id="codigo" placeholder="Escanea o escribe el código de barras...">
   <input type="number" id="cantidad" placeholder="Cantidad" value="1">
@@ -330,12 +324,11 @@ const grupo = {
         </tr>
       </thead>
       <tbody id="tabla-productos">
-        <!-- productos escaneados -->
+        <!-- articulos escaneados -->
       </tbody>
     </table>
   </div>
 
-  <!-- Modal de selección de folio -->
   <div id="modal-folios">
     <div>
       <h3>Selecciona un folio para descargar</h3>
