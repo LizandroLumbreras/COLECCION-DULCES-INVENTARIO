@@ -27,6 +27,7 @@
     const tabla = document.getElementById("tabla-productos");
     const guardarBtn = document.getElementById("guardar");
     const exportarBtn = document.getElementById("exportar");
+    const agregarBtn = document.getElementById("agregar");
     const folioSpan = document.getElementById("folio");
 
     let articulosEscaneados = [];
@@ -40,44 +41,60 @@
       return `INVT-DULCES-${fecha}-${hora}`;
     }
 
-    inputCodigo.addEventListener("keypress", async (e) => {
+    inputCodigo.addEventListener("keypress", (e) => {
       if (e.key === "Enter") {
-        const codigo = inputCodigo.value.trim();
-        const cantidad = parseInt(inputCantidad.value) || 1;
-        if (!codigo || cantidad <= 0) return;
+        e.preventDefault();
+        inputCantidad.focus();
+      }
+    });
 
-        const yaExiste = articulosEscaneados.find(p => p.codigo === codigo);
-        if (yaExiste) {
-          alert("Este código ya fue escaneado.");
-          inputCodigo.value = "";
-          return;
+    inputCantidad.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        agregarBtn.click();
+      }
+    });
+
+    agregarBtn.addEventListener("click", async () => {
+      const codigo = inputCodigo.value.trim();
+      const cantidad = parseInt(inputCantidad.value) || 1;
+      if (!codigo || cantidad <= 0) return;
+
+      const yaExiste = articulosEscaneados.find(p => p.codigo === codigo);
+      if (yaExiste) {
+        alert("Este código ya fue escaneado.");
+        inputCodigo.value = "";
+        inputCantidad.value = 1;
+        inputCodigo.focus();
+        return;
+      }
+
+      const productosSnapshot = await getDocs(collection(db, "productos"));
+      let encontrado = null;
+      productosSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data["Codigo Barra"] === codigo) {
+          encontrado = data;
         }
+      });
 
-        const productosSnapshot = await getDocs(collection(db, "productos"));
-        let encontrado = null;
-        productosSnapshot.forEach(doc => {
-          const data = doc.data();
-          if (data["Codigo Barra"] === codigo) {
-            encontrado = data;
-          }
-        });
+      if (encontrado) {
+        const producto = {
+          descripcion: encontrado.Concepto || "Sin descripción",
+          codigo: encontrado["Codigo Barra"],
+          precio: parseFloat(encontrado["Precio Publico"] || 0).toFixed(2),
+          cantidad: cantidad,
+          timestamp: new Date().toISOString()
+        };
 
-        if (encontrado) {
-          const producto = {
-            descripcion: encontrado.Concepto || "Sin descripción",
-            codigo: encontrado["Codigo Barra"],
-            precio: parseFloat(encontrado["Precio Publico"] || 0).toFixed(2),
-            cantidad: cantidad,
-            timestamp: new Date().toISOString()
-          };
-
-          articulosEscaneados.push(producto);
-          actualizarTabla();
-          inputCodigo.value = "";
-          inputCantidad.value = 1;
-        } else {
-          alert("Producto no encontrado.");
-        }
+        articulosEscaneados.push(producto);
+        actualizarTabla();
+        inputCodigo.value = "";
+        inputCantidad.value = 1;
+        inputCodigo.focus();
+      } else {
+        alert("Producto no encontrado.");
+        inputCodigo.focus();
       }
     });
 
@@ -111,7 +128,7 @@
       articulosEscaneados = [];
       actualizarTabla();
 
-      // Nuevo folio para siguiente sesión
+      // Nuevo folio
       folioGenerado = generarFolio();
       folioSpan.textContent = folioGenerado;
     });
@@ -153,8 +170,9 @@
       font-size: 18px;
       border-radius: 6px;
       border: none;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
       width: 100%;
+      box-sizing: border-box;
     }
 
     .contenedor-tabla {
@@ -205,6 +223,7 @@
   <h3>Folio actual: <span id="folio"></span></h3>
   <input type="text" id="codigo" placeholder="Escanea o escribe el código de barras...">
   <input type="number" id="cantidad" placeholder="Cantidad..." min="1" value="1">
+  <button id="agregar">➕ Agregar</button>
   <button id="guardar">💾 Guardar Inventario</button>
   <button id="exportar">📥 Descargar Excel</button>
 
