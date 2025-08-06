@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Escanear Artículos - Almacén Dulces</title>
 
-  <!-- Fuente profesional -->
+  <!-- Fuente y librería Excel -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+  <!-- Estilos -->
   <style>
     body {
       font-family: 'Poppins', sans-serif;
@@ -141,9 +142,13 @@
     }
   </style>
 
+  <!-- Script optimizado -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import {
+      getFirestore, collection, addDoc, getDocs,
+      query, where
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
@@ -197,30 +202,32 @@
           return;
         }
 
-        const productosSnapshot = await getDocs(collection(db, "productos"));
-        let encontrado = null;
-        productosSnapshot.forEach(doc => {
-          const data = doc.data();
-          if (data["Codigo Barra"] === codigo) {
-            encontrado = data;
+        try {
+          const q = query(collection(db, "productos"), where("Codigo Barra", "==", codigo));
+          const querySnapshot = await getDocs(q);
+
+          if (!querySnapshot.empty) {
+            const doc = querySnapshot.docs[0];
+            const data = doc.data();
+
+            const producto = {
+              descripcion: data.Concepto || "Sin descripción",
+              codigo: data["Codigo Barra"],
+              precio: parseFloat(data["Precio Publico"] || 0).toFixed(2),
+              cantidad: cantidad,
+              timestamp: new Date().toISOString()
+            };
+
+            articulosEscaneados.push(producto);
+            actualizarTabla();
+            inputCodigo.value = "";
+            inputCantidad.value = "1";
+          } else {
+            alert("Producto no encontrado.");
           }
-        });
-
-        if (encontrado) {
-          const producto = {
-            descripcion: encontrado.Concepto || "Sin descripción",
-            codigo: encontrado["Codigo Barra"],
-            precio: parseFloat(encontrado["Precio Publico"] || 0).toFixed(2),
-            cantidad: cantidad,
-            timestamp: new Date().toISOString()
-          };
-
-          articulosEscaneados.push(producto);
-          actualizarTabla();
-          inputCodigo.value = "";
-          inputCantidad.value = "1";
-        } else {
-          alert("Producto no encontrado.");
+        } catch (err) {
+          console.error("Error en la búsqueda:", err);
+          alert("Error al buscar el producto.");
         }
       }
     });
@@ -357,7 +364,6 @@
 
   <label for="palabraClave">Palabra clave (opcional):</label>
   <input type="text" id="palabraClave" placeholder="Ej. BODEGA, URGENTE, PROV">
-
   <input type="text" id="codigo" placeholder="Escanea o escribe el código de barras...">
   <input type="number" id="cantidad" placeholder="Cantidad" value="1">
 
@@ -377,9 +383,7 @@
           <th>Acciones</th>
         </tr>
       </thead>
-      <tbody id="tabla-productos">
-        <!-- artículos escaneados -->
-      </tbody>
+      <tbody id="tabla-productos"></tbody>
     </table>
   </div>
 
