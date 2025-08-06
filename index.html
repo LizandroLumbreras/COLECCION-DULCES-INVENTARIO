@@ -5,219 +5,350 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Escanear Artículos - Almacén Dulces</title>
 
+  <!-- Fuente profesional -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(to right, #00416A, #E4E5E6);
+      color: white;
+      padding: 20px;
+      margin: 0;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .folio-box {
+      background: white;
+      color: #00416A;
+      font-weight: bold;
+      padding: 6px 12px;
+      border-radius: 8px;
+      display: inline-block;
+      margin-bottom: 15px;
+    }
+
+    input, button, select {
+      font-family: inherit;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: none;
+      margin-bottom: 10px;
+      width: 100%;
+      max-width: 500px;
+      display: block;
+    }
+
+    .boton {
+      background: #0c6cbd;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .boton:hover {
+      background: #084f92;
+    }
+
+    .contenedor-tabla {
+      background: white;
+      color: black;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin-top: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+
+    th {
+      background-color: #00416A;
+      color: white;
+      position: sticky;
+      top: 0;
+    }
+
+    td button {
+      padding: 6px 10px;
+      margin: 2px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    #modal-folios {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #modal-folios > div {
+      background: white;
+      color: black;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 90%;
+      width: 400px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.4);
+    }
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 20px;
+      }
+
+      input, button, select {
+        font-size: 18px;
+        padding: 14px;
+      }
+
+      th, td {
+        font-size: 14px;
+        padding: 8px;
+      }
+
+      td button {
+        font-size: 18px;
+        padding: 8px 12px;
+      }
+
+      #modal-folios > div {
+        width: 95%;
+      }
+    }
+  </style>
+
   <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
-    authDomain: "inventariopv-643f1.firebaseapp.com",
-    projectId: "inventariopv-643f1",
-    storageBucket: "inventariopv-643f1.appspot.com",
-    messagingSenderId: "96242533231",
-    appId: "1:96242533231:web:aae75a18fbaf9840529e9a"
-  };
+    const firebaseConfig = {
+      apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
+      authDomain: "inventariopv-643f1.firebaseapp.com",
+      projectId: "inventariopv-643f1",
+      storageBucket: "inventariopv-643f1.appspot.com",
+      messagingSenderId: "96242533231",
+      appId: "1:96242533231:web:aae75a18fbaf9840529e9a"
+    };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-  const inputCodigo = document.getElementById("codigo");
-  const inputCantidad = document.getElementById("cantidad");
-  const inputClave = document.getElementById("palabraClave");
-  const tabla = document.getElementById("tabla-productos");
-  const exportarBtn = document.getElementById("exportar");
-  const guardarBtn = document.getElementById("guardar");
-  const folioSpan = document.getElementById("folio");
-  const modal = document.getElementById("modal-folios");
-  const select = document.getElementById("select-folio");
+    const inputCodigo = document.getElementById("codigo");
+    const inputCantidad = document.getElementById("cantidad");
+    const inputClave = document.getElementById("palabraClave");
+    const tabla = document.getElementById("tabla-productos");
+    const exportarBtn = document.getElementById("exportar");
+    const guardarBtn = document.getElementById("guardar");
+    const folioSpan = document.getElementById("folio");
+    const modal = document.getElementById("modal-folios");
+    const select = document.getElementById("select-folio");
 
-  // 🔄 Restaurar estado al cargar
-  let articulosEscaneados = JSON.parse(localStorage.getItem("articulosEscaneadosDulces")) || [];
-  let folio = localStorage.getItem("folioInventarioDulces") || generarFolio();
-  let palabraClaveGuardada = localStorage.getItem("claveInventarioDulces") || "";
+    let articulosEscaneados = JSON.parse(localStorage.getItem("articulosEscaneadosDulces")) || [];
+    let folio = localStorage.getItem("folioInventarioDulces") || generarFolio();
+    let palabraClaveGuardada = localStorage.getItem("claveInventarioDulces") || "";
 
-  folioSpan.textContent = folio;
-  inputClave.value = palabraClaveGuardada;
-  actualizarTabla();
+    folioSpan.textContent = folio;
+    inputClave.value = palabraClaveGuardada;
+    actualizarTabla();
 
-  function generarFolio() {
-    const fecha = new Date();
-    let base = `INVT-DULCES-${fecha.toISOString().slice(0,10).replace(/-/g, '')}-${fecha.getHours()}${fecha.getMinutes()}${fecha.getSeconds()}`;
-    const clave = inputClave?.value.trim();
-    if (clave) base += `-${clave.replace(/\s+/g, "_").toUpperCase()}`;
-    return base;
-  }
+    function generarFolio() {
+      const fecha = new Date();
+      let base = `INVT-DULCES-${fecha.toISOString().slice(0,10).replace(/-/g, '')}-${fecha.getHours()}${fecha.getMinutes()}${fecha.getSeconds()}`;
+      const clave = inputClave?.value.trim();
+      if (clave) base += `-${clave.replace(/\s+/g, "_").toUpperCase()}`;
+      return base;
+    }
 
-  inputClave.addEventListener("input", () => {
-    localStorage.setItem("claveInventarioDulces", inputClave.value.trim());
-  });
+    inputClave.addEventListener("input", () => {
+      localStorage.setItem("claveInventarioDulces", inputClave.value.trim());
+    });
 
-  inputCodigo.addEventListener("keypress", async (e) => {
-    if (e.key === "Enter") {
-      const codigo = inputCodigo.value.trim();
-      const cantidad = parseInt(inputCantidad.value.trim());
+    inputCodigo.addEventListener("keypress", async (e) => {
+      if (e.key === "Enter") {
+        const codigo = inputCodigo.value.trim();
+        const cantidad = parseInt(inputCantidad.value.trim());
 
-      if (!codigo || isNaN(cantidad) || cantidad <= 0) {
-        alert("Código o cantidad inválida.");
+        if (!codigo || isNaN(cantidad) || cantidad <= 0) {
+          alert("Código o cantidad inválida.");
+          return;
+        }
+
+        const productosSnapshot = await getDocs(collection(db, "productos"));
+        let encontrado = null;
+        productosSnapshot.forEach(doc => {
+          const data = doc.data();
+          if (data["Codigo Barra"] === codigo) {
+            encontrado = data;
+          }
+        });
+
+        if (encontrado) {
+          const producto = {
+            descripcion: encontrado.Concepto || "Sin descripción",
+            codigo: encontrado["Codigo Barra"],
+            precio: parseFloat(encontrado["Precio Publico"] || 0).toFixed(2),
+            cantidad: cantidad,
+            timestamp: new Date().toISOString()
+          };
+
+          articulosEscaneados.push(producto);
+          actualizarTabla();
+          inputCodigo.value = "";
+          inputCantidad.value = "1";
+        } else {
+          alert("Producto no encontrado.");
+        }
+      }
+    });
+
+    function actualizarTabla() {
+      tabla.innerHTML = "";
+      articulosEscaneados.forEach((p, index) => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${p.descripcion}</td>
+          <td>${p.codigo}</td>
+          <td>${p.cantidad}</td>
+          <td>$${p.precio}</td>
+          <td>${p.timestamp.slice(0, 10)}</td>
+          <td>
+            <button onclick="editarCantidad(${index})">✏️</button>
+            <button onclick="eliminarArticulo(${index})">🗑️</button>
+          </td>
+        `;
+        tabla.appendChild(fila);
+      });
+
+      localStorage.setItem("articulosEscaneadosDulces", JSON.stringify(articulosEscaneados));
+      localStorage.setItem("folioInventarioDulces", folio);
+    }
+
+    guardarBtn.addEventListener("click", async () => {
+      if (articulosEscaneados.length === 0) {
+        alert("No hay artículos para guardar.");
         return;
       }
 
-      const productosSnapshot = await getDocs(collection(db, "productos"));
-      let encontrado = null;
-      productosSnapshot.forEach(doc => {
-        const data = doc.data();
-        if (data["Codigo Barra"] === codigo) {
-          encontrado = data;
-        }
-      });
-
-      if (encontrado) {
-        const producto = {
-          descripcion: encontrado.Concepto || "Sin descripción",
-          codigo: encontrado["Codigo Barra"],
-          precio: parseFloat(encontrado["Precio Publico"] || 0).toFixed(2),
-          cantidad: cantidad,
-          timestamp: new Date().toISOString()
-        };
-
-        articulosEscaneados.push(producto);
-        actualizarTabla();
-        inputCodigo.value = "";
-        inputCantidad.value = "1";
-      } else {
-        alert("Producto no encontrado.");
-      }
-    }
-  });
-
-  function actualizarTabla() {
-    tabla.innerHTML = "";
-    articulosEscaneados.forEach((p, index) => {
-      const fila = document.createElement("tr");
-      fila.innerHTML = `
-        <td>${index + 1}</td>
-        <td>${p.descripcion}</td>
-        <td>${p.codigo}</td>
-        <td>${p.cantidad}</td>
-        <td>$${p.precio}</td>
-        <td>${p.timestamp.slice(0, 10)}</td>
-        <td>
-          <button onclick="editarCantidad(${index})">✏️</button>
-          <button onclick="eliminarArticulo(${index})">🗑️</button>
-        </td>
-      `;
-      tabla.appendChild(fila);
-    });
-
-    // 🔐 Guardar en localStorage
-    localStorage.setItem("articulosEscaneadosDulces", JSON.stringify(articulosEscaneados));
-    localStorage.setItem("folioInventarioDulces", folio);
-  }
-
-  guardarBtn.addEventListener("click", async () => {
-    if (articulosEscaneados.length === 0) {
-      alert("No hay artículos para guardar.");
-      return;
-    }
-
-    folio = generarFolio();
-    folioSpan.textContent = folio;
-
-    const grupo = {
-      folio: folio,
-      fecha: new Date().toISOString(),
-      articulos: articulosEscaneados,
-      totalArticulos: articulosEscaneados.length
-    };
-
-    try {
-      await addDoc(collection(db, "almacenes/Almacen_Dulces/inventarios"), grupo);
-      alert(`✅ Inventario guardado con folio: ${folio}`);
-
-      // 🧹 Limpiar
-      articulosEscaneados = [];
-      localStorage.removeItem("articulosEscaneadosDulces");
-      localStorage.removeItem("folioInventarioDulces");
-      localStorage.removeItem("claveInventarioDulces");
-      actualizarTabla();
       folio = generarFolio();
       folioSpan.textContent = folio;
-      inputCodigo.value = "";
-      inputCantidad.value = "1";
-      inputClave.value = "";
-    } catch (e) {
-      console.error("Error al guardar:", e);
-      alert("❌ Error al guardar el inventario.");
-    }
-  });
 
-  exportarBtn.addEventListener("click", async () => {
-    modal.style.display = "flex";
-    select.innerHTML = `<option value="">Cargando folios...</option>`;
+      const grupo = {
+        folio: folio,
+        fecha: new Date().toISOString(),
+        articulos: articulosEscaneados,
+        totalArticulos: articulosEscaneados.length
+      };
 
-    const snapshot = await getDocs(collection(db, "almacenes/Almacen_Dulces/inventarios"));
-    select.innerHTML = `<option value="">Selecciona un folio</option>`;
-    window.foliosMap = {};
+      try {
+        await addDoc(collection(db, "almacenes/Almacen_Dulces/inventarios"), grupo);
+        alert(`✅ Inventario guardado con folio: ${folio}`);
 
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      if (data.folio) {
-        window.foliosMap[data.folio] = data;
-        const option = document.createElement("option");
-        option.value = data.folio;
-        option.textContent = data.folio;
-        select.appendChild(option);
+        articulosEscaneados = [];
+        localStorage.removeItem("articulosEscaneadosDulces");
+        localStorage.removeItem("folioInventarioDulces");
+        localStorage.removeItem("claveInventarioDulces");
+        actualizarTabla();
+        folio = generarFolio();
+        folioSpan.textContent = folio;
+        inputCodigo.value = "";
+        inputCantidad.value = "1";
+        inputClave.value = "";
+      } catch (e) {
+        console.error("Error al guardar:", e);
+        alert("❌ Error al guardar el inventario.");
       }
     });
-  });
 
-  document.getElementById("descargar-seleccionado").addEventListener("click", () => {
-    const folioSeleccionado = select.value;
-    const grupo = window.foliosMap[folioSeleccionado];
-    if (!folioSeleccionado || !grupo) {
-      alert("Selecciona un folio válido.");
-      return;
-    }
+    exportarBtn.addEventListener("click", async () => {
+      modal.style.display = "flex";
+      select.innerHTML = `<option value="">Cargando folios...</option>`;
 
-    const encabezados = [["#", "Descripción", "Código", "Cantidad", "Precio", "Fecha", "Folio"]];
-    const datos = grupo.articulos.map((p, i) => [
-      i + 1,
-      p.descripcion,
-      p.codigo,
-      p.cantidad,
-      p.precio,
-      p.timestamp?.slice(0, 10) || "",
-      grupo.folio
-    ]);
+      const snapshot = await getDocs(collection(db, "almacenes/Almacen_Dulces/inventarios"));
+      select.innerHTML = `<option value="">Selecciona un folio</option>`;
+      window.foliosMap = {};
 
-    const contenido = encabezados.concat(datos);
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(contenido);
-    XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-    XLSX.writeFile(wb, `Inventario_${folioSeleccionado}.xlsx`);
-    modal.style.display = "none";
-  });
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.folio) {
+          window.foliosMap[data.folio] = data;
+          const option = document.createElement("option");
+          option.value = data.folio;
+          option.textContent = data.folio;
+          select.appendChild(option);
+        }
+      });
+    });
 
-  window.editarCantidad = function(index) {
-    const nueva = prompt("Nueva cantidad:", articulosEscaneados[index].cantidad);
-    const num = parseInt(nueva);
-    if (!isNaN(num) && num > 0) {
-      articulosEscaneados[index].cantidad = num;
-      actualizarTabla();
-    } else {
-      alert("Cantidad inválida.");
-    }
-  };
+    document.getElementById("descargar-seleccionado").addEventListener("click", () => {
+      const folioSeleccionado = select.value;
+      const grupo = window.foliosMap[folioSeleccionado];
+      if (!folioSeleccionado || !grupo) {
+        alert("Selecciona un folio válido.");
+        return;
+      }
 
-  window.eliminarArticulo = function(index) {
-    if (confirm("¿Eliminar este artículo?")) {
-      articulosEscaneados.splice(index, 1);
-      actualizarTabla();
-    }
-  };
-</script>
+      const encabezados = [["#", "Descripción", "Código", "Cantidad", "Precio", "Fecha", "Folio"]];
+      const datos = grupo.articulos.map((p, i) => [
+        i + 1,
+        p.descripcion,
+        p.codigo,
+        p.cantidad,
+        p.precio,
+        p.timestamp?.slice(0, 10) || "",
+        grupo.folio
+      ]);
+
+      const contenido = encabezados.concat(datos);
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(contenido);
+      XLSX.utils.book_append_sheet(wb, ws, "Inventario");
+      XLSX.writeFile(wb, `Inventario_${folioSeleccionado}.xlsx`);
+      modal.style.display = "none";
+    });
+
+    window.editarCantidad = function(index) {
+      const nueva = prompt("Nueva cantidad:", articulosEscaneados[index].cantidad);
+      const num = parseInt(nueva);
+      if (!isNaN(num) && num > 0) {
+        articulosEscaneados[index].cantidad = num;
+        actualizarTabla();
+      } else {
+        alert("Cantidad inválida.");
+      }
+    };
+
+    window.eliminarArticulo = function(index) {
+      if (confirm("¿Eliminar este artículo?")) {
+        articulosEscaneados.splice(index, 1);
+        actualizarTabla();
+      }
+    };
+  </script>
 </head>
 <body>
   <h1>Escanear Artículos - Almacén Dulces</h1>
@@ -247,7 +378,7 @@
         </tr>
       </thead>
       <tbody id="tabla-productos">
-        <!-- articulos escaneados -->
+        <!-- artículos escaneados -->
       </tbody>
     </table>
   </div>
@@ -255,9 +386,9 @@
   <div id="modal-folios">
     <div>
       <h3>Selecciona un folio para descargar</h3>
-      <select id="select-folio" style="width:100%; padding:10px; margin-top:10px; margin-bottom:15px;"></select>
+      <select id="select-folio"></select>
       <button id="descargar-seleccionado" class="boton">📥 Descargar Excel</button>
-      <button onclick="document.getElementById('modal-folios').style.display='none'" style="margin-top:10px; padding:8px; width:100%;">Cancelar</button>
+      <button onclick="document.getElementById('modal-folios').style.display='none'" class="boton" style="background:#ccc; color:#000;">Cancelar</button>
     </div>
   </div>
 </body>
