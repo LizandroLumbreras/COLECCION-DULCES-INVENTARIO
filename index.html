@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Escanear Artículos - Almacén Dulces</title>
+
+  <!-- XLSX para exportar a Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -21,15 +26,28 @@
     const db = getFirestore(app);
 
     const inputCodigo = document.getElementById("codigo");
+    const inputCantidad = document.getElementById("cantidad");
     const tabla = document.getElementById("tabla-productos");
     const exportarBtn = document.getElementById("exportar");
+    const guardarBtn = document.getElementById("guardar");
+    const folioSpan = document.getElementById("folio");
 
     let articulosEscaneados = [];
+
+    // Generar folio único al iniciar
+    const fechaHoy = new Date();
+    const folio = `INVT-DULCES-${fechaHoy.toISOString().slice(0,10).replace(/-/g, '')}-${fechaHoy.getHours()}${fechaHoy.getMinutes()}${fechaHoy.getSeconds()}`;
+    folioSpan.textContent = folio;
 
     inputCodigo.addEventListener("keypress", async (e) => {
       if (e.key === "Enter") {
         const codigo = inputCodigo.value.trim();
-        if (!codigo) return;
+        const cantidad = parseInt(inputCantidad.value.trim());
+
+        if (!codigo || isNaN(cantidad) || cantidad <= 0) {
+          alert("Código o cantidad inválida.");
+          return;
+        }
 
         const productosSnapshot = await getDocs(collection(db, "productos"));
         let encontrado = null;
@@ -45,51 +63,19 @@
             descripcion: encontrado.Concepto || "Sin descripción",
             codigo: encontrado["Codigo Barra"],
             precio: parseFloat(encontrado["Precio Publico"] || 0).toFixed(2),
-            cantidad: 1,
+            cantidad: cantidad,
             timestamp: new Date().toISOString()
           };
 
-          await addDoc(collection(db, "almacenes/Almacen_Dulces/sistema"), producto);
-
           articulosEscaneados.push(producto);
           actualizarTabla();
-
           inputCodigo.value = "";
+          inputCantidad.value = "1";
         } else {
           alert("Producto no encontrado.");
         }
       }
     });
-
-    window.actualizarCantidad = function(index, nuevaCantidad) {
-      const cantidad = parseInt(nuevaCantidad);
-      if (!isNaN(cantidad) && cantidad > 0) {
-        articulosEscaneados[index].cantidad = cantidad;
-      } else {
-        alert("Cantidad inválida");
-        actualizarTabla();
-      }
-    }
-
-    window.eliminarArticulo = function(index) {
-      if (confirm("¿Deseas eliminar este artículo?")) {
-        articulosEscaneados.splice(index, 1);
-        actualizarTabla();
-      }
-    }
-
-    window.editarArticulo = function(index) {
-      const nuevaCantidad = prompt("Ingresa nueva cantidad:", articulosEscaneados[index].cantidad || 1);
-      if (nuevaCantidad !== null) {
-        const cantidad = parseInt(nuevaCantidad);
-        if (!isNaN(cantidad) && cantidad > 0) {
-          articulosEscaneados[index].cantidad = cantidad;
-          actualizarTabla();
-        } else {
-          alert("Cantidad inválida.");
-        }
-      }
-    }
 
     function actualizarTabla() {
       tabla.innerHTML = "";
@@ -99,19 +85,42 @@
           <td>${index + 1}</td>
           <td>${p.descripcion}</td>
           <td>${p.codigo}</td>
-          <td contenteditable="true" onblur="actualizarCantidad(${index}, this.innerText.trim())">${p.cantidad}</td>
+          <td>${p.cantidad}</td>
           <td>$${p.precio}</td>
           <td>${p.timestamp.slice(0, 10)}</td>
-          <td>
-            <button onclick="editarArticulo(${index})">✏️</button>
-            <button onclick="eliminarArticulo(${index})">🗑️</button>
-          </td>
         `;
         tabla.appendChild(fila);
       });
     }
 
+    guardarBtn.addEventListener("click", async () => {
+      if (articulosEscaneados.length === 0) {
+        alert("No hay artículos para guardar.");
+        return;
+      }
+
+      const grupo = {
+        folio: folio,
+        fecha: new Date().toISOString(),
+        articulos: articulosEscaneados,
+        totalArticulos: articulosEscaneados.length
+      };
+
+      try {
+        await addDoc(collection(db, "almacenes/Almacen_Dulces/inventarios"), grupo);
+        alert(`✅ Inventario guardado con folio: ${folio}`);
+      } catch (e) {
+        console.error("Error al guardar:", e);
+        alert("❌ Error al guardar el inventario.");
+      }
+    });
+
     exportarBtn.addEventListener("click", () => {
+      if (articulosEscaneados.length === 0) {
+        alert("No hay datos para exportar.");
+        return;
+      }
+
       const encabezados = [["#", "Descripción", "Código", "Cantidad", "Precio", "Fecha"]];
       const datos = articulosEscaneados.map((p, i) => [
         i + 1,
@@ -125,11 +134,10 @@
       const contenido = encabezados.concat(datos);
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(contenido);
-      XLSX.utils.book_append_sheet(wb, ws, "Escaneados");
-      XLSX.writeFile(wb, "articulos_escaneados.xlsx");
+      XLSX.utils.book_append_sheet(wb, ws, "Inventario");
+      XLSX.writeFile(wb, `Inventario_${folio}.xlsx`);
     });
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
     body {
@@ -140,12 +148,16 @@
       min-height: 100vh;
     }
 
+    h1 {
+      margin-bottom: 10px;
+    }
+
     input, button {
       padding: 10px;
-      font-size: 18px;
+      font-size: 16px;
       border-radius: 6px;
       border: none;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
       width: 100%;
     }
 
@@ -154,6 +166,7 @@
       color: black;
       border-radius: 8px;
       overflow-x: auto;
+      margin-top: 20px;
     }
 
     table {
@@ -164,7 +177,7 @@
     th, td {
       padding: 10px;
       border: 1px solid #ccc;
-      text-align: left;
+      text-align: center;
     }
 
     th {
@@ -174,26 +187,38 @@
       top: 0;
     }
 
-    button {
+    .boton {
       background: #0c6cbd;
       color: white;
       cursor: pointer;
     }
 
-    button:hover {
+    .boton:hover {
       background: #0b5aa5;
     }
 
-    .acciones button {
-      margin-right: 5px;
-      padding: 6px;
+    .folio-box {
+      background: white;
+      color: #00416A;
+      font-weight: bold;
+      padding: 6px 12px;
+      border-radius: 8px;
+      display: inline-block;
+      margin-bottom: 15px;
     }
   </style>
 </head>
 <body>
   <h1>Escanear Artículos - Almacén Dulces</h1>
+
+  <div>Folio actual: <span class="folio-box" id="folio"></span></div>
+
   <input type="text" id="codigo" placeholder="Escanea o escribe el código de barras...">
-  <button id="exportar">📥 Descargar Excel</button>
+  <input type="number" id="cantidad" placeholder="Cantidad" value="1">
+
+  <button class="boton" id="guardar">💾 Guardar Inventario</button>
+  <button class="boton" id="exportar">📥 Descargar Excel</button>
+
   <div class="contenedor-tabla">
     <table>
       <thead>
@@ -204,7 +229,6 @@
           <th>Cantidad</th>
           <th>Precio</th>
           <th>Fecha</th>
-          <th>Acciones</th>
         </tr>
       </thead>
       <tbody id="tabla-productos">
