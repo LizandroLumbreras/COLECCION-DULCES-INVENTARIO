@@ -31,13 +31,20 @@
     const exportarBtn = document.getElementById("exportar");
     const guardarBtn = document.getElementById("guardar");
     const folioSpan = document.getElementById("folio");
+    const modal = document.getElementById("modal-folios");
+    const select = document.getElementById("select-folio");
 
     let articulosEscaneados = [];
+  let folio = generarFolio();  // ← genera el folio desde el inicio con palabra clave si la hay
+folioSpan.textContent = folio;
 
-    // Generar folio único al iniciar
-    const fechaHoy = new Date();
-    const folio = `INVT-DULCES-${fechaHoy.toISOString().slice(0,10).replace(/-/g, '')}-${fechaHoy.getHours()}${fechaHoy.getMinutes()}${fechaHoy.getSeconds()}`;
-    folioSpan.textContent = folio;
+function generarFolio() {
+  const fecha = new Date();
+  let base = `INVT-DULCES-${fecha.toISOString().slice(0,10).replace(/-/g, '')}-${fecha.getHours()}${fecha.getMinutes()}${fecha.getSeconds()}`;
+  const clave = document.getElementById("palabraClave")?.value.trim();
+  if (clave) base += `-${clave.replace(/\s+/g, "_").toUpperCase()}`;
+  return base;
+}
 
     inputCodigo.addEventListener("keypress", async (e) => {
       if (e.key === "Enter") {
@@ -77,7 +84,6 @@
       }
     });
 
-    // Función para actualizar tabla
     function actualizarTabla() {
       tabla.innerHTML = "";
       articulosEscaneados.forEach((p, index) => {
@@ -98,15 +104,17 @@
       });
     }
 
-    // Guardar inventario completo
     guardarBtn.addEventListener("click", async () => {
       if (articulosEscaneados.length === 0) {
         alert("No hay artículos para guardar.");
         return;
       }
 
-      const grupo = {
-        folio: folio,
+     folio = generarFolio();
+folioSpan.textContent = folio;
+
+const grupo = {
+  folio: folio,
         fecha: new Date().toISOString(),
         articulos: articulosEscaneados,
         totalArticulos: articulosEscaneados.length
@@ -115,37 +123,67 @@
       try {
         await addDoc(collection(db, "almacenes/Almacen_Dulces/inventarios"), grupo);
         alert(`✅ Inventario guardado con folio: ${folio}`);
+
+        // Limpiar todo
+        articulosEscaneados = [];
+        actualizarTabla();
+        folio = generarFolio();
+        folioSpan.textContent = folio;
+        inputCodigo.value = "";
+        inputCantidad.value = "1";
       } catch (e) {
         console.error("Error al guardar:", e);
         alert("❌ Error al guardar el inventario.");
+        document.getElementById("palabraClave").value = "";
       }
     });
 
-    // Exportar a Excel
-    exportarBtn.addEventListener("click", () => {
-      if (articulosEscaneados.length === 0) {
-        alert("No hay datos para exportar.");
+    exportarBtn.addEventListener("click", async () => {
+      modal.style.display = "flex";
+      select.innerHTML = `<option value="">Cargando folios...</option>`;
+
+      const snapshot = await getDocs(collection(db, "almacenes/Almacen_Dulces/inventarios"));
+      select.innerHTML = `<option value="">Selecciona un folio</option>`;
+
+      window.foliosMap = {};
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.folio) {
+          window.foliosMap[data.folio] = data;
+          const option = document.createElement("option");
+          option.value = data.folio;
+          option.textContent = data.folio;
+          select.appendChild(option);
+        }
+      });
+    });
+
+    document.getElementById("descargar-seleccionado").addEventListener("click", () => {
+      const folioSeleccionado = select.value;
+      const grupo = window.foliosMap[folioSeleccionado];
+      if (!folioSeleccionado || !grupo) {
+        alert("Selecciona un folio válido.");
         return;
       }
 
       const encabezados = [["#", "Descripción", "Código", "Cantidad", "Precio", "Fecha"]];
-      const datos = articulosEscaneados.map((p, i) => [
+      const datos = grupo.articulos.map((p, i) => [
         i + 1,
         p.descripcion,
         p.codigo,
         p.cantidad,
         p.precio,
-        p.timestamp.slice(0, 10)
+        p.timestamp?.slice(0, 10) || ""
       ]);
 
       const contenido = encabezados.concat(datos);
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(contenido);
       XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-      XLSX.writeFile(wb, `Inventario_${folio}.xlsx`);
+      XLSX.writeFile(wb, `Inventario_${folioSeleccionado}.xlsx`);
+      modal.style.display = "none";
     });
 
-    // Funciones globales para botones de edición/eliminación
     window.editarCantidad = function(index) {
       const nueva = prompt("Nueva cantidad:", articulosEscaneados[index].cantidad);
       const num = parseInt(nueva);
@@ -241,12 +279,36 @@
       font-size: 16px;
       cursor: pointer;
     }
+
+    /* Modal */
+    #modal-folios {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #modal-folios > div {
+      background: white;
+      color: black;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 90%;
+      width: 400px;
+    }
   </style>
 </head>
 <body>
   <h1>Escanear Artículos - Almacén Dulces</h1>
 
   <div>Folio actual: <span class="folio-box" id="folio"></span></div>
+  <div style="margin-bottom:10px;">
+  <label for="palabraClave">Palabra clave (opcional):</label>
+  <input type="text" id="palabraClave" placeholder="Ej. BODEGA, PROV, URGENTE">
+</div>
 
   <input type="text" id="codigo" placeholder="Escanea o escribe el código de barras...">
   <input type="number" id="cantidad" placeholder="Cantidad" value="1">
@@ -271,6 +333,16 @@
         <!-- productos escaneados -->
       </tbody>
     </table>
+  </div>
+
+  <!-- Modal de selección de folio -->
+  <div id="modal-folios">
+    <div>
+      <h3>Selecciona un folio para descargar</h3>
+      <select id="select-folio" style="width:100%; padding:10px; margin-top:10px; margin-bottom:15px;"></select>
+      <button id="descargar-seleccionado" class="boton">📥 Descargar Excel</button>
+      <button onclick="document.getElementById('modal-folios').style.display='none'" style="margin-top:10px; padding:8px; width:100%;">Cancelar</button>
+    </div>
   </div>
 </body>
 </html>
