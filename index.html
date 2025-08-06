@@ -77,6 +77,7 @@
       }
     });
 
+    // Función para actualizar tabla
     function actualizarTabla() {
       tabla.innerHTML = "";
       articulosEscaneados.forEach((p, index) => {
@@ -88,11 +89,16 @@
           <td>${p.cantidad}</td>
           <td>$${p.precio}</td>
           <td>${p.timestamp.slice(0, 10)}</td>
+          <td>
+            <button onclick="editarCantidad(${index})">✏️</button>
+            <button onclick="eliminarArticulo(${index})">🗑️</button>
+          </td>
         `;
         tabla.appendChild(fila);
       });
     }
 
+    // Guardar inventario completo
     guardarBtn.addEventListener("click", async () => {
       if (articulosEscaneados.length === 0) {
         alert("No hay artículos para guardar.");
@@ -115,6 +121,7 @@
       }
     });
 
+    // Exportar a Excel
     exportarBtn.addEventListener("click", () => {
       if (articulosEscaneados.length === 0) {
         alert("No hay datos para exportar.");
@@ -137,6 +144,25 @@
       XLSX.utils.book_append_sheet(wb, ws, "Inventario");
       XLSX.writeFile(wb, `Inventario_${folio}.xlsx`);
     });
+
+    // Funciones globales para botones de edición/eliminación
+    window.editarCantidad = function(index) {
+      const nueva = prompt("Nueva cantidad:", articulosEscaneados[index].cantidad);
+      const num = parseInt(nueva);
+      if (!isNaN(num) && num > 0) {
+        articulosEscaneados[index].cantidad = num;
+        actualizarTabla();
+      } else {
+        alert("Cantidad inválida.");
+      }
+    };
+
+    window.eliminarArticulo = function(index) {
+      if (confirm("¿Eliminar este artículo?")) {
+        articulosEscaneados.splice(index, 1);
+        actualizarTabla();
+      }
+    };
   </script>
 
   <style>
@@ -206,6 +232,15 @@
       display: inline-block;
       margin-bottom: 15px;
     }
+
+    td button {
+      padding: 6px 10px;
+      margin: 2px;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -229,6 +264,7 @@
           <th>Cantidad</th>
           <th>Precio</th>
           <th>Fecha</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody id="tabla-productos">
