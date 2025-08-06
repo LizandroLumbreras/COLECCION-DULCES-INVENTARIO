@@ -6,8 +6,9 @@
   <title>Escanear y Guardar - Dulces</title>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-    import { getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import {
+      getFirestore, collection, addDoc, getDocs
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
@@ -22,44 +23,64 @@
     const db = getFirestore(app);
 
     const inputCodigo = document.getElementById("codigo");
+    const inputCantidad = document.getElementById("cantidad");
     const tabla = document.getElementById("tabla-productos");
+    const guardarBtn = document.getElementById("guardar");
     const exportarBtn = document.getElementById("exportar");
+    const folioSpan = document.getElementById("folio");
 
     let articulosEscaneados = [];
+    let folioGenerado = generarFolio();
+    folioSpan.textContent = folioGenerado;
+
+    function generarFolio() {
+      const ahora = new Date();
+      const fecha = ahora.toISOString().slice(0, 10).replace(/-/g, "");
+      const hora = ahora.toTimeString().slice(0, 8).replace(/:/g, "");
+      return `INVT-DULCES-${fecha}-${hora}`;
+    }
 
     inputCodigo.addEventListener("keypress", async (e) => {
-  if (e.key === "Enter") {
-    const codigo = inputCodigo.value.trim();
-    if (!codigo) return;
+      if (e.key === "Enter") {
+        const codigo = inputCodigo.value.trim();
+        const cantidad = parseInt(inputCantidad.value) || 1;
+        if (!codigo || cantidad <= 0) return;
 
-    const productosSnapshot = await getDocs(collection(db, "productos"));
-    let encontrado = null;
-    productosSnapshot.forEach(doc => {
-      const data = doc.data();
-      if (data["Codigo Barra"] === codigo) {
-        encontrado = data;
+        const yaExiste = articulosEscaneados.find(p => p.codigo === codigo);
+        if (yaExiste) {
+          alert("Este código ya fue escaneado.");
+          inputCodigo.value = "";
+          return;
+        }
+
+        const productosSnapshot = await getDocs(collection(db, "productos"));
+        let encontrado = null;
+        productosSnapshot.forEach(doc => {
+          const data = doc.data();
+          if (data["Codigo Barra"] === codigo) {
+            encontrado = data;
+          }
+        });
+
+        if (encontrado) {
+          const producto = {
+            descripcion: encontrado.Concepto || "Sin descripción",
+            codigo: encontrado["Codigo Barra"],
+            precio: parseFloat(encontrado["Precio Publico"] || 0).toFixed(2),
+            cantidad: cantidad,
+            timestamp: new Date().toISOString()
+          };
+
+          articulosEscaneados.push(producto);
+          actualizarTabla();
+          inputCodigo.value = "";
+          inputCantidad.value = 1;
+        } else {
+          alert("Producto no encontrado.");
+        }
       }
     });
 
-    if (encontrado) {
-      const producto = {
-        descripcion: encontrado.Concepto || "Sin descripción",
-        codigo: encontrado["Codigo Barra"],
-        precio: parseFloat(encontrado["Precio Publico"] || 0).toFixed(2),
-        timestamp: new Date().toISOString()
-      };
-
-      await addDoc(collection(db, "almacenes/Almacen_Dulces/sistema"), producto);
-
-      articulosEscaneados.push(producto);
-      actualizarTabla();
-
-      inputCodigo.value = "";
-    } else {
-      alert("Producto no encontrado.");
-    }
-  }
-});
     function actualizarTabla() {
       tabla.innerHTML = "";
       articulosEscaneados.forEach((p, index) => {
@@ -68,6 +89,7 @@
           <td>${index + 1}</td>
           <td>${p.descripcion}</td>
           <td>${p.codigo}</td>
+          <td>${p.cantidad}</td>
           <td>$${p.precio}</td>
           <td>${p.timestamp.slice(0, 10)}</td>
         `;
@@ -75,21 +97,45 @@
       });
     }
 
-    exportarBtn.addEventListener("click", () => {
-      const encabezados = [["#", "Descripción", "Código", "Precio", "Fecha"]];
-      const datos = articulosEscaneados.map((p, i) => [
-        i + 1,
-        p.descripcion,
-        p.codigo,
-        p.precio,
-        p.timestamp.slice(0, 10)
-      ]);
+    guardarBtn.addEventListener("click", async () => {
+      if (articulosEscaneados.length === 0) {
+        alert("No hay productos escaneados.");
+        return;
+      }
 
-      const contenido = encabezados.concat(datos);
+      for (const producto of articulosEscaneados) {
+        await addDoc(collection(db, `almacenes/Almacen_Dulces/inventarios/${folioGenerado}/items`), producto);
+      }
+
+      alert(`Guardado con éxito bajo folio: ${folioGenerado}`);
+      articulosEscaneados = [];
+      actualizarTabla();
+
+      // Nuevo folio para siguiente sesión
+      folioGenerado = generarFolio();
+      folioSpan.textContent = folioGenerado;
+    });
+
+    exportarBtn.addEventListener("click", async () => {
+      const snapshot = await getDocs(collection(db, `almacenes/Almacen_Dulces/inventarios/${folioGenerado}/items`));
+      const todos = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        todos.push([
+          todos.length + 1,
+          data.descripcion || "Sin descripción",
+          data.codigo || "",
+          data.cantidad || 0,
+          `$${parseFloat(data.precio || 0).toFixed(2)}`,
+          (data.timestamp || "").slice(0, 10)
+        ]);
+      });
+
+      const contenido = [["#", "Descripción", "Código", "Cantidad", "Precio", "Fecha"]].concat(todos);
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(contenido);
-      XLSX.utils.book_append_sheet(wb, ws, "Escaneados");
-      XLSX.writeFile(wb, "articulos_escaneados.xlsx");
+      XLSX.utils.book_append_sheet(wb, ws, `Folio_${folioGenerado}`);
+      XLSX.writeFile(wb, `inventario_${folioGenerado}.xlsx`);
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -145,12 +191,23 @@
     button:hover {
       background: #0b5aa5;
     }
+
+    h3 span {
+      background: white;
+      color: #00416A;
+      padding: 5px 10px;
+      border-radius: 6px;
+    }
   </style>
 </head>
 <body>
   <h1>Escanear Artículos - Almacén Dulces</h1>
+  <h3>Folio actual: <span id="folio"></span></h3>
   <input type="text" id="codigo" placeholder="Escanea o escribe el código de barras...">
+  <input type="number" id="cantidad" placeholder="Cantidad..." min="1" value="1">
+  <button id="guardar">💾 Guardar Inventario</button>
   <button id="exportar">📥 Descargar Excel</button>
+
   <div class="contenedor-tabla">
     <table>
       <thead>
@@ -158,6 +215,7 @@
           <th>#</th>
           <th>Descripción</th>
           <th>Código</th>
+          <th>Cantidad</th>
           <th>Precio</th>
           <th>Fecha</th>
         </tr>
