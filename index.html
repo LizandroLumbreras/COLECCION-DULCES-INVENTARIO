@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Escanear y Guardar - Dulces</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
+      authDomain: "inventariopv-643f1.firebaseapp.com",
+      projectId: "inventariopv-643f1",
+      storageBucket: "inventariopv-643f1.appspot.com",
+      messagingSenderId: "96242533231",
+      appId: "1:96242533231:web:aae75a18fbaf9840529e9a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const inputCodigo = document.getElementById("codigo");
+    const tabla = document.getElementById("tabla-productos");
+    const exportarBtn = document.getElementById("exportar");
+
+    let articulosEscaneados = [];
+
+    inputCodigo.addEventListener("keypress", async (e) => {
+      if (e.key === "Enter") {
+        const codigo = inputCodigo.value.trim();
+        if (!codigo) return;
+
+        // Buscar en productos
+        const productosSnapshot = await getDocs(collection(db, "productos"));
+        let encontrado = null;
+        productosSnapshot.forEach(doc => {
+          const data = doc.data();
+          if (data["Codigo Barra"] === codigo) {
+            encontrado = data;
+          }
+        });
+
+        if (encontrado) {
+          const producto = {
+            descripcion: encontrado.Concepto || "Sin descripción",
+            codigo: encontrado["Codigo Barra"],
+            precio: parseFloat(encontrado["Precio Publico"] || 0).toFixed(2),
+            timestamp: new Date().toISOString()
+          };
+
+          // Guardar en Firebase en colección dulces-sistema
+          await addDoc(collection(db, "almacenes/Almacen_Dulces/sistema"), producto);
+
+          // Agregar a la tabla local
+          articulosEscaneados.push(producto);
+          actualizarTabla();
+
+          inputCodigo.value = "";
+        } else {
+          alert("Producto no encontrado.");
+        }
+      }
+    });
+
+    function actualizarTabla() {
+      tabla.innerHTML = "";
+      articulosEscaneados.forEach((p, index) => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${p.descripcion}</td>
+          <td>${p.codigo}</td>
+          <td>$${p.precio}</td>
+          <td>${p.timestamp.slice(0, 10)}</td>
+        `;
+        tabla.appendChild(fila);
+      });
+    }
+
+    exportarBtn.addEventListener("click", () => {
+      const encabezados = [["#", "Descripción", "Código", "Precio", "Fecha"]];
+      const datos = articulosEscaneados.map((p, i) => [
+        i + 1,
+        p.descripcion,
+        p.codigo,
+        p.precio,
+        p.timestamp.slice(0, 10)
+      ]);
+
+      const contenido = encabezados.concat(datos);
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(contenido);
+      XLSX.utils.book_append_sheet(wb, ws, "Escaneados");
+      XLSX.writeFile(wb, "articulos_escaneados.xlsx");
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #00416A, #E4E5E6);
+      color: white;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    input, button {
+      padding: 10px;
+      font-size: 18px;
+      border-radius: 6px;
+      border: none;
+      margin-bottom: 15px;
+      width: 100%;
+    }
+
+    .contenedor-tabla {
+      background: white;
+      color: black;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ccc;
+      text-align: left;
+    }
+
+    th {
+      background-color: #00416A;
+      color: white;
+      position: sticky;
+      top: 0;
+    }
+
+    button {
+      background: #0c6cbd;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0b5aa5;
+    }
+  </style>
+</head>
+<body>
+  <h1>Escanear Artículos - Almacén Dulces</h1>
+  <input type="text" id="codigo" placeholder="Escanea o escribe el código de barras...">
+  <button id="exportar">📥 Descargar Excel</button>
+  <div class="contenedor-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Descripción</th>
+          <th>Código</th>
+          <th>Precio</th>
+          <th>Fecha</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-productos">
+        <!-- productos escaneados -->
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
