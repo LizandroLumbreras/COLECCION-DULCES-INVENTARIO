@@ -21,124 +21,44 @@
       box-sizing: border-box;
     }
 
-    h1 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
+    h1 { text-align: center; margin-bottom: 20px; }
 
     .folio-box {
-      background: white;
-      color: #00416A;
-      font-weight: bold;
-      padding: 6px 12px;
-      border-radius: 8px;
-      display: inline-block;
-      margin-bottom: 15px;
+      background: white; color: #00416A; font-weight: bold;
+      padding: 6px 12px; border-radius: 8px; display: inline-block; margin-bottom: 15px;
     }
 
     input, button, select {
-      font-family: inherit;
-      padding: 10px;
-      font-size: 16px;
-      border-radius: 6px;
-      border: none;
-      margin-bottom: 10px;
-      width: 100%;
-      max-width: 500px;
-      display: block;
+      font-family: inherit; padding: 10px; font-size: 16px;
+      border-radius: 6px; border: none; margin-bottom: 10px; width: 100%; max-width: 500px; display: block;
     }
 
-    .boton {
-      background: #0c6cbd;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
+    .boton { background: #0c6cbd; color: white; font-weight: bold; cursor: pointer; transition: background 0.3s ease; }
+    .boton:hover { background: #084f92; }
 
-    .boton:hover {
-      background: #084f92;
-    }
+    .contenedor-tabla { background: white; color: black; border-radius: 8px; overflow-x: auto; margin-top: 20px; }
 
-    .contenedor-tabla {
-      background: white;
-      color: black;
-      border-radius: 8px;
-      overflow-x: auto;
-      margin-top: 20px;
-    }
+    table { width: 100%; border-collapse: collapse; min-width: 600px; }
+    th, td { padding: 10px; border: 1px solid #ccc; text-align: center; }
+    th { background-color: #00416A; color: white; position: sticky; top: 0; }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 600px;
-    }
-
-    th, td {
-      padding: 10px;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
-
-    th {
-      background-color: #00416A;
-      color: white;
-      position: sticky;
-      top: 0;
-    }
-
-    td button {
-      padding: 6px 10px;
-      margin: 2px;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-      cursor: pointer;
-    }
+    td button { padding: 6px 10px; margin: 2px; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
 
     #modal-folios {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 999;
-      justify-content: center;
-      align-items: center;
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 999; justify-content: center; align-items: center;
     }
-
     #modal-folios > div {
-      background: white;
-      color: black;
-      padding: 20px;
-      border-radius: 10px;
-      max-width: 90%;
-      width: 400px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.4);
+      background: white; color: black; padding: 20px; border-radius: 10px;
+      max-width: 90%; width: 400px; box-shadow: 0 0 10px rgba(0,0,0,0.4);
     }
 
     @media (max-width: 600px) {
-      h1 {
-        font-size: 20px;
-      }
-
-      input, button, select {
-        font-size: 18px;
-        padding: 14px;
-      }
-
-      th, td {
-        font-size: 14px;
-        padding: 8px;
-      }
-
-      td button {
-        font-size: 18px;
-        padding: 8px 12px;
-      }
-
-      #modal-folios > div {
-        width: 95%;
-      }
+      h1 { font-size: 20px; }
+      input, button, select { font-size: 18px; padding: 14px; }
+      th, td { font-size: 14px; padding: 8px; }
+      td button { font-size: 18px; padding: 8px 12px; }
+      #modal-folios > div { width: 95%; }
     }
   </style>
 
@@ -149,6 +69,10 @@
       getFirestore, collection, addDoc, getDocs,
       query, where
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // ===== Config =====
+    const DEC_CANTIDAD = 3; // <<--- 3 decimales en cantidad
+    const DEC_PRECIO = 2;   // <<--- Precio sigue a 2 decimales (cambio a 3 si lo requieres)
 
     const firebaseConfig = {
       apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
@@ -161,6 +85,10 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+
+    // Helpers de formato
+    const roundTo = (num, dec) => Math.round((Number(num) + Number.EPSILON) * 10**dec) / 10**dec;
+    const fmt = (num, dec) => Number(num).toFixed(dec);
 
     const inputCodigo = document.getElementById("codigo");
     const inputCantidad = document.getElementById("cantidad");
@@ -195,7 +123,8 @@
     inputCodigo.addEventListener("keypress", async (e) => {
       if (e.key === "Enter") {
         const codigo = inputCodigo.value.trim();
-        const cantidad = parseInt(inputCantidad.value.trim());
+        const cantidadRaw = inputCantidad.value.trim();
+        const cantidad = roundTo(parseFloat(cantidadRaw), DEC_CANTIDAD); // <<--- admite 3 decimales
 
         if (!codigo || isNaN(cantidad) || cantidad <= 0) {
           alert("Código o cantidad inválida.");
@@ -210,18 +139,21 @@
             const doc = querySnapshot.docs[0];
             const data = doc.data();
 
+            const precioNum = parseFloat(data["Precio Publico"] || 0); // num
             const producto = {
               descripcion: data.Concepto || "Sin descripción",
               codigo: data["Codigo Barra"],
-              precio: parseFloat(data["Precio Publico"] || 0).toFixed(2),
-              cantidad: cantidad,
+              precio: roundTo(precioNum, DEC_PRECIO), // guardado con 2 decimales (num)
+              cantidad: cantidad,                     // guardado con 3 decimales (num)
               timestamp: new Date().toISOString()
             };
 
             articulosEscaneados.push(producto);
             actualizarTabla();
+
             inputCodigo.value = "";
-            inputCantidad.value = "1";
+            inputCantidad.value = "1.000"; // sugerencia con 3 decimales
+            inputCodigo.focus();
           } else {
             alert("Producto no encontrado.");
           }
@@ -240,9 +172,9 @@
           <td>${index + 1}</td>
           <td>${p.descripcion}</td>
           <td>${p.codigo}</td>
-          <td>${p.cantidad}</td>
-          <td>$${p.precio}</td>
-          <td>${p.timestamp.slice(0, 10)}</td>
+          <td>${fmt(p.cantidad, DEC_CANTIDAD)}</td>
+          <td>$${fmt(p.precio, DEC_PRECIO)}</td>
+          <td>${(p.timestamp || "").slice(0, 10)}</td>
           <td>
             <button onclick="editarCantidad(${index})">✏️</button>
             <button onclick="eliminarArticulo(${index})">🗑️</button>
@@ -283,7 +215,7 @@
         folio = generarFolio();
         folioSpan.textContent = folio;
         inputCodigo.value = "";
-        inputCantidad.value = "1";
+        inputCantidad.value = "1.000";
         inputClave.value = "";
       } catch (e) {
         console.error("Error al guardar:", e);
@@ -320,13 +252,15 @@
       }
 
       const encabezados = [["#", "Descripción", "Código", "Cantidad", "Precio", "Fecha", "Folio"]];
-      const datos = grupo.articulos.map((p, i) => [
+      const datos = (grupo.articulos || []).map((p, i) => [
         i + 1,
         p.descripcion,
         p.codigo,
-        p.cantidad,
-        p.precio,
-        p.timestamp?.slice(0, 10) || "",
+        // Exporta con 3 decimales en cantidad:
+        fmt(p.cantidad ?? 0, DEC_CANTIDAD),
+        // Precio con 2 decimales (cambio a 3 si lo pides):
+        fmt(p.precio ?? 0, DEC_PRECIO),
+        (p.timestamp || "").slice(0, 10),
         grupo.folio
       ]);
 
@@ -338,11 +272,13 @@
       modal.style.display = "none";
     });
 
+    // Exponer funciones para botones de la tabla
     window.editarCantidad = function(index) {
-      const nueva = prompt("Nueva cantidad:", articulosEscaneados[index].cantidad);
-      const num = parseInt(nueva);
-      if (!isNaN(num) && num > 0) {
-        articulosEscaneados[index].cantidad = num;
+      const actual = articulosEscaneados[index].cantidad;
+      const nuevaStr = prompt("Nueva cantidad (admite 3 decimales):", fmt(actual, DEC_CANTIDAD));
+      const nueva = roundTo(parseFloat(nuevaStr), DEC_CANTIDAD);
+      if (!isNaN(nueva) && nueva > 0) {
+        articulosEscaneados[index].cantidad = nueva;
         actualizarTabla();
       } else {
         alert("Cantidad inválida.");
@@ -364,8 +300,10 @@
 
   <label for="palabraClave">Palabra clave (opcional):</label>
   <input type="text" id="palabraClave" placeholder="Ej. BODEGA, URGENTE, PROV">
+
   <input type="text" id="codigo" placeholder="Escanea o escribe el código de barras...">
-  <input type="number" id="cantidad" placeholder="Cantidad" value="1">
+  <!-- step con 3 decimales -->
+  <input type="number" id="cantidad" placeholder="Cantidad" value="1.000" step="0.001" min="0.001">
 
   <button class="boton" id="guardar">💾 Guardar Inventario</button>
   <button class="boton" id="exportar">📥 Descargar Excel</button>
@@ -397,3 +335,4 @@
   </div>
 </body>
 </html>
+
