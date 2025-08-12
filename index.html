@@ -9,60 +9,34 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Estilos -->
   <style>
-    body {
-      font-family: 'Poppins', sans-serif;
-      background: linear-gradient(to right, #00416A, #E4E5E6);
-      color: white;
-      padding: 20px;
-      margin: 0;
-      min-height: 100vh;
-      box-sizing: border-box;
-    }
-
-    h1 { text-align: center; margin-bottom: 20px; }
-
-    .folio-box {
-      background: white; color: #00416A; font-weight: bold;
-      padding: 6px 12px; border-radius: 8px; display: inline-block; margin-bottom: 15px;
-    }
-
-    input, button, select {
-      font-family: inherit; padding: 10px; font-size: 16px;
-      border-radius: 6px; border: none; margin-bottom: 10px; width: 100%; max-width: 500px; display: block;
-    }
-
-    .boton { background: #0c6cbd; color: white; font-weight: bold; cursor: pointer; transition: background 0.3s ease; }
-    .boton:hover { background: #084f92; }
-
-    .contenedor-tabla { background: white; color: black; border-radius: 8px; overflow-x: auto; margin-top: 20px; }
-
-    table { width: 100%; border-collapse: collapse; min-width: 600px; }
-    th, td { padding: 10px; border: 1px solid #ccc; text-align: center; }
-    th { background-color: #00416A; color: white; position: sticky; top: 0; }
-
-    td button { padding: 6px 10px; margin: 2px; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
-
-    #modal-folios {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-      z-index: 999; justify-content: center; align-items: center;
-    }
-    #modal-folios > div {
-      background: white; color: black; padding: 20px; border-radius: 10px;
-      max-width: 90%; width: 400px; box-shadow: 0 0 10px rgba(0,0,0,0.4);
-    }
-
-    @media (max-width: 600px) {
-      h1 { font-size: 20px; }
-      input, button, select { font-size: 18px; padding: 14px; }
-      th, td { font-size: 14px; padding: 8px; }
-      td button { font-size: 18px; padding: 8px 12px; }
-      #modal-folios > div { width: 95%; }
+    body{font-family:'Poppins',sans-serif;background:linear-gradient(to right,#00416A,#E4E5E6);color:white;padding:20px;margin:0;min-height:100vh;box-sizing:border-box}
+    h1{text-align:center;margin-bottom:20px}
+    .fila{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    .folio-box{background:white;color:#00416A;font-weight:bold;padding:6px 12px;border-radius:8px;display:inline-block}
+    input,button,select{font-family:inherit;padding:10px;font-size:16px;border-radius:6px;border:none}
+    input{width:100%;max-width:320px}
+    .acciones button{width:auto}
+    .boton{background:#0c6cbd;color:white;font-weight:bold;cursor:pointer;transition:background .3s}
+    .boton:hover{background:#084f92}
+    .sec{margin-top:14px}
+    .contenedor-tabla{background:white;color:black;border-radius:8px;overflow-x:auto;margin-top:14px}
+    table{width:100%;border-collapse:collapse;min-width:760px}
+    th,td{padding:10px;border:1px solid #ccc;text-align:center}
+    th{background-color:#00416A;color:white;position:sticky;top:0}
+    td button{padding:6px 10px;margin:2px;border:none;border-radius:6px;font-size:16px;cursor:pointer}
+    .resumen{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:10px;display:flex;gap:16px;flex-wrap:wrap}
+    #modal-folios{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:center}
+    #modal-folios>div{background:white;color:black;padding:20px;border-radius:10px;max-width:90%;width:400px;box-shadow:0 0 10px rgba(0,0,0,.4)}
+    @media(max-width:600px){
+      h1{font-size:20px}
+      input,button,select{font-size:18px;padding:14px}
+      th,td{font-size:14px;padding:8px}
+      td button{font-size:18px;padding:8px 12px}
+      #modal-folios>div{width:95%}
     }
   </style>
 
-  <!-- Script optimizado -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import {
@@ -71,8 +45,9 @@
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     // ===== Config =====
-    const DEC_CANTIDAD = 3; // <<--- 3 decimales en cantidad
-    const DEC_PRECIO = 2;   // <<--- Precio sigue a 2 decimales (cambio a 3 si lo requieres)
+    const DEC_CANTIDAD = 3; // cantidades con 3 decimales
+    const DEC_PRECIO   = 2; // precios con 2 decimales
+    const DEC_IMPORTE  = 2;
 
     const firebaseConfig = {
       apiKey: "AIzaSyCK5nb6u2CGRJ8AB1aPlRn54b97bdeAFeM",
@@ -86,31 +61,46 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Helpers de formato
+    // Helpers
     const roundTo = (num, dec) => Math.round((Number(num) + Number.EPSILON) * 10**dec) / 10**dec;
-    const fmt = (num, dec) => Number(num).toFixed(dec);
+    const fmt     = (num, dec) => Number(num ?? 0).toFixed(dec);
 
-    const inputCodigo = document.getElementById("codigo");
-    const inputCantidad = document.getElementById("cantidad");
-    const inputClave = document.getElementById("palabraClave");
-    const tabla = document.getElementById("tabla-productos");
-    const exportarBtn = document.getElementById("exportar");
-    const guardarBtn = document.getElementById("guardar");
-    const folioSpan = document.getElementById("folio");
-    const modal = document.getElementById("modal-folios");
+    // DOM
+    const inputClave     = document.getElementById("palabraClave");
+    const inputCodigo    = document.getElementById("codigo");
+    const inputCantidad  = document.getElementById("cantidad");
+    const btnAgregar     = document.getElementById("agregar");
+    const exportarBtn    = document.getElementById("exportar");
+    const exportarActBtn = document.getElementById("exportar-actual");
+    const limpiarBtn     = document.getElementById("limpiar");
+    const limpiarCacheBtn= document.getElementById("limpiar-cache");
+    const guardarBtn     = document.getElementById("guardar");
+    const folioSpan      = document.getElementById("folio");
+    const tabla          = document.getElementById("tabla-productos");
+    const tRenglones     = document.getElementById("tRenglones");
+    const tCantidad      = document.getElementById("tCantidad");
+    const tImporte       = document.getElementById("tImporte");
+
+    const modal  = document.getElementById("modal-folios");
     const select = document.getElementById("select-folio");
 
+    // Estado
     let articulosEscaneados = JSON.parse(localStorage.getItem("articulosEscaneadosDulces")) || [];
     let folio = localStorage.getItem("folioInventarioDulces") || generarFolio();
     let palabraClaveGuardada = localStorage.getItem("claveInventarioDulces") || "";
+    let cacheProductos = JSON.parse(localStorage.getItem("cacheProductosDulces") || "{}"); // { codigo: {descripcion,codigo,precio} }
 
     folioSpan.textContent = folio;
     inputClave.value = palabraClaveGuardada;
     actualizarTabla();
 
+    function guardarCache() {
+      localStorage.setItem("cacheProductosDulces", JSON.stringify(cacheProductos));
+    }
+
     function generarFolio() {
       const fecha = new Date();
-      let base = `INVT-DULCES-${fecha.toISOString().slice(0,10).replace(/-/g, '')}-${fecha.getHours()}${fecha.getMinutes()}${fecha.getSeconds()}`;
+      let base = `INVT-DULCES-${fecha.toISOString().slice(0,10).replace(/-/g, '')}-${fecha.getHours()}${String(fecha.getMinutes()).padStart(2,'0')}${String(fecha.getSeconds()).padStart(2,'0')}`;
       const clave = inputClave?.value.trim();
       if (clave) base += `-${clave.replace(/\s+/g, "_").toUpperCase()}`;
       return base;
@@ -120,53 +110,97 @@
       localStorage.setItem("claveInventarioDulces", inputClave.value.trim());
     });
 
-    inputCodigo.addEventListener("keypress", async (e) => {
+    // Búsqueda con mini-cache
+    async function buscarProductoPorCodigo(codigo) {
+      if (cacheProductos[codigo]) return cacheProductos[codigo];
+
+      const q = query(collection(db, "productos"), where("Codigo Barra", "==", codigo));
+      const snap = await getDocs(q);
+      if (snap.empty) throw new Error("Producto no encontrado");
+
+      const data = snap.docs[0].data();
+      const prod = {
+        descripcion: data.Concepto || "Sin descripción",
+        codigo: data["Codigo Barra"],
+        precio: roundTo(parseFloat(data["Precio Publico"] || 0), DEC_PRECIO)
+      };
+      cacheProductos[codigo] = prod;
+      guardarCache();
+      return prod;
+    }
+
+    // Flujo de foco: Enter en código -> cantidad
+    inputCodigo.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
-        const codigo = inputCodigo.value.trim();
-        const cantidadRaw = inputCantidad.value.trim();
-        const cantidad = roundTo(parseFloat(cantidadRaw), DEC_CANTIDAD); // <<--- admite 3 decimales
-
-        if (!codigo || isNaN(cantidad) || cantidad <= 0) {
-          alert("Código o cantidad inválida.");
-          return;
-        }
-
-        try {
-          const q = query(collection(db, "productos"), where("Codigo Barra", "==", codigo));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-            const doc = querySnapshot.docs[0];
-            const data = doc.data();
-
-            const precioNum = parseFloat(data["Precio Publico"] || 0); // num
-            const producto = {
-              descripcion: data.Concepto || "Sin descripción",
-              codigo: data["Codigo Barra"],
-              precio: roundTo(precioNum, DEC_PRECIO), // guardado con 2 decimales (num)
-              cantidad: cantidad,                     // guardado con 3 decimales (num)
-              timestamp: new Date().toISOString()
-            };
-
-            articulosEscaneados.push(producto);
-            actualizarTabla();
-
-            inputCodigo.value = "";
-            inputCantidad.value = "1.000"; // sugerencia con 3 decimales
-            inputCodigo.focus();
-          } else {
-            alert("Producto no encontrado.");
-          }
-        } catch (err) {
-          console.error("Error en la búsqueda:", err);
-          alert("Error al buscar el producto.");
-        }
+        e.preventDefault();
+        inputCantidad.focus();
+        inputCantidad.select();
       }
     });
 
+    // Enter en cantidad -> agrega
+    inputCantidad.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        agregarArticuloDesdeInputs();
+      }
+    });
+
+    btnAgregar.addEventListener("click", agregarArticuloDesdeInputs);
+
+    async function agregarArticuloDesdeInputs() {
+      const codigo = (inputCodigo.value || "").trim();
+      const cantidadRaw = (inputCantidad.value || "").trim();
+      const cantidad = roundTo(parseFloat(cantidadRaw), DEC_CANTIDAD);
+
+      if (!codigo || isNaN(cantidad) || cantidad <= 0) {
+        alert("Código o cantidad inválida.");
+        (!codigo ? inputCodigo : inputCantidad).focus();
+        return;
+      }
+
+      try {
+        const p = await buscarProductoPorCodigo(codigo);
+        const idx = articulosEscaneados.findIndex(x => x.codigo === p.codigo);
+
+        if (idx !== -1) {
+          // Sumar cantidad si ya existe
+          articulosEscaneados[idx].cantidad = roundTo(Number(articulosEscaneados[idx].cantidad) + cantidad, DEC_CANTIDAD);
+          articulosEscaneados[idx].timestamp = new Date().toISOString();
+        } else {
+          articulosEscaneados.push({
+            descripcion: p.descripcion,
+            codigo: p.codigo,
+            precio: p.precio,
+            cantidad: cantidad,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        actualizarTabla();
+
+        // Reset para siguiente escaneo
+        inputCodigo.value = "";
+        inputCantidad.value = "1.000";
+        inputCodigo.focus();
+      } catch (err) {
+        console.error(err);
+        alert("Producto no encontrado.");
+        inputCodigo.focus();
+        inputCodigo.select();
+      }
+    }
+
     function actualizarTabla() {
       tabla.innerHTML = "";
+      let sumaCant = 0;
+      let sumaImp  = 0;
+
       articulosEscaneados.forEach((p, index) => {
+        const importe = roundTo((Number(p.cantidad) || 0) * (Number(p.precio) || 0), DEC_IMPORTE);
+        sumaCant += Number(p.cantidad) || 0;
+        sumaImp  += importe;
+
         const fila = document.createElement("tr");
         fila.innerHTML = `
           <td>${index + 1}</td>
@@ -174,7 +208,8 @@
           <td>${p.codigo}</td>
           <td>${fmt(p.cantidad, DEC_CANTIDAD)}</td>
           <td>$${fmt(p.precio, DEC_PRECIO)}</td>
-          <td>${(p.timestamp || "").slice(0, 10)}</td>
+          <td>$${fmt(importe, DEC_IMPORTE)}</td>
+          <td>${(p.timestamp || "").slice(0, 19).replace('T',' ')}</td>
           <td>
             <button onclick="editarCantidad(${index})">✏️</button>
             <button onclick="eliminarArticulo(${index})">🗑️</button>
@@ -183,6 +218,12 @@
         tabla.appendChild(fila);
       });
 
+      // Totales
+      tRenglones.textContent = articulosEscaneados.length;
+      tCantidad.textContent  = fmt(sumaCant, DEC_CANTIDAD);
+      tImporte.textContent   = fmt(sumaImp, DEC_IMPORTE);
+
+      // Persistencia local
       localStorage.setItem("articulosEscaneadosDulces", JSON.stringify(articulosEscaneados));
       localStorage.setItem("folioInventarioDulces", folio);
     }
@@ -197,10 +238,13 @@
       folioSpan.textContent = folio;
 
       const grupo = {
-        folio: folio,
+        folio,
         fecha: new Date().toISOString(),
         articulos: articulosEscaneados,
-        totalArticulos: articulosEscaneados.length
+        totalArticulos: articulosEscaneados.length,
+        sumaCantidades: articulosEscaneados.reduce((a,b)=>a+(Number(b.cantidad)||0),0),
+        sumaImporte:   roundTo(articulosEscaneados.reduce((a,b)=>a+((Number(b.cantidad)||0)*(Number(b.precio)||0)),0), DEC_IMPORTE),
+        palabraClave: (inputClave.value||"").trim() || null
       };
 
       try {
@@ -210,19 +254,25 @@
         articulosEscaneados = [];
         localStorage.removeItem("articulosEscaneadosDulces");
         localStorage.removeItem("folioInventarioDulces");
-        localStorage.removeItem("claveInventarioDulces");
+        // NO borramos la clave por si sigues con el mismo contexto
         actualizarTabla();
         folio = generarFolio();
         folioSpan.textContent = folio;
         inputCodigo.value = "";
         inputCantidad.value = "1.000";
-        inputClave.value = "";
       } catch (e) {
         console.error("Error al guardar:", e);
         alert("❌ Error al guardar el inventario.");
       }
     });
 
+    // Exportar Excel de la lista actual (sin guardar)
+    exportarActBtn.addEventListener("click", () => {
+      if (!articulosEscaneados.length) return alert("No hay artículos en la lista actual.");
+      exportarAExcel(articulosEscaneados, folio);
+    });
+
+    // Exportar Excel por folio guardado
     exportarBtn.addEventListener("click", async () => {
       modal.style.display = "flex";
       select.innerHTML = `<option value="">Cargando folios...</option>`;
@@ -244,32 +294,55 @@
     });
 
     document.getElementById("descargar-seleccionado").addEventListener("click", () => {
-      const folioSeleccionado = select.value;
-      const grupo = window.foliosMap[folioSeleccionado];
-      if (!folioSeleccionado || !grupo) {
-        alert("Selecciona un folio válido.");
-        return;
-      }
-
-      const encabezados = [["#", "Descripción", "Código", "Cantidad", "Precio", "Fecha", "Folio"]];
-      const datos = (grupo.articulos || []).map((p, i) => [
-        i + 1,
-        p.descripcion,
-        p.codigo,
-        // Exporta con 3 decimales en cantidad:
-        fmt(p.cantidad ?? 0, DEC_CANTIDAD),
-        // Precio con 2 decimales (cambio a 3 si lo pides):
-        fmt(p.precio ?? 0, DEC_PRECIO),
-        (p.timestamp || "").slice(0, 10),
-        grupo.folio
-      ]);
-
-      const contenido = encabezados.concat(datos);
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(contenido);
-      XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-      XLSX.writeFile(wb, `Inventario_${folioSeleccionado}.xlsx`);
+      const folioSel = select.value;
+      const grupo = window.foliosMap?.[folioSel];
+      if (!folioSel || !grupo) return alert("Selecciona un folio válido.");
+      exportarAExcel(grupo.articulos || [], grupo.folio);
       modal.style.display = "none";
+    });
+
+    function exportarAExcel(lista, folioParaNombre) {
+      const encabezados = [["#", "Descripción", "Código", "Cantidad", "Precio", "Importe", "Fecha", "Folio"]];
+      const datos = lista.map((p, i) => {
+        const importe = roundTo((Number(p.cantidad)||0)*(Number(p.precio)||0), DEC_IMPORTE);
+        return [
+          i + 1,
+          p.descripcion,
+          p.codigo,
+          fmt(p.cantidad ?? 0, DEC_CANTIDAD),
+          fmt(p.precio ?? 0, DEC_PRECIO),
+          fmt(importe, DEC_IMPORTE),
+          (p.timestamp || "").slice(0, 19).replace('T',' '),
+          folioParaNombre
+        ];
+      });
+
+      // Totales al final
+      const sumaCant = lista.reduce((a,b)=>a+(Number(b.cantidad)||0),0);
+      const sumaImp  = roundTo(lista.reduce((a,b)=>a+((Number(b.cantidad)||0)*(Number(b.precio)||0)),0), DEC_IMPORTE);
+      datos.push([]);
+      datos.push(["", "TOTALES", "", fmt(sumaCant, DEC_CANTIDAD), "", fmt(sumaImp, DEC_IMPORTE), "", folioParaNombre]);
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(encabezados.concat(datos));
+      XLSX.utils.book_append_sheet(wb, ws, "Inventario");
+      XLSX.writeFile(wb, `Inventario_${folioParaNombre}.xlsx`);
+    }
+
+    limpiarBtn.addEventListener("click", () => {
+      if (!articulosEscaneados.length) return;
+      if (confirm("¿Limpiar la lista actual?")) {
+        articulosEscaneados = [];
+        actualizarTabla();
+      }
+    });
+
+    limpiarCacheBtn.addEventListener("click", () => {
+      if (confirm("¿Borrar la caché local de productos?")) {
+        cacheProductos = {};
+        guardarCache();
+        alert("Caché borrada.");
+      }
     });
 
     // Exponer funciones para botones de la tabla
@@ -279,6 +352,7 @@
       const nueva = roundTo(parseFloat(nuevaStr), DEC_CANTIDAD);
       if (!isNaN(nueva) && nueva > 0) {
         articulosEscaneados[index].cantidad = nueva;
+        articulosEscaneados[index].timestamp = new Date().toISOString();
         actualizarTabla();
       } else {
         alert("Cantidad inválida.");
@@ -296,17 +370,28 @@
 <body>
   <h1>Escanear Artículos - Almacén Dulces</h1>
 
-  <div>Folio actual: <span class="folio-box" id="folio"></span></div>
+  <div class="fila">
+    <div>Folio actual: <span class="folio-box" id="folio"></span></div>
+  </div>
 
-  <label for="palabraClave">Palabra clave (opcional):</label>
-  <input type="text" id="palabraClave" placeholder="Ej. BODEGA, URGENTE, PROV">
+  <div class="fila sec">
+    <label for="palabraClave" style="min-width:140px">Palabra clave:</label>
+    <input type="text" id="palabraClave" placeholder="Ej. BODEGA, URGENTE, PROV">
+  </div>
 
-  <input type="text" id="codigo" placeholder="Escanea o escribe el código de barras...">
-  <!-- step con 3 decimales -->
-  <input type="number" id="cantidad" placeholder="Cantidad" value="1.000" step="0.001" min="0.001">
+  <div class="fila sec">
+    <input type="text" id="codigo" placeholder="Escanea o escribe el código de barras...">
+    <input type="number" id="cantidad" placeholder="Cantidad" value="1.000" step="0.001" min="0.001">
+    <button class="boton" id="agregar">➕ Agregar</button>
+  </div>
 
-  <button class="boton" id="guardar">💾 Guardar Inventario</button>
-  <button class="boton" id="exportar">📥 Descargar Excel</button>
+  <div class="fila acciones sec">
+    <button class="boton" id="guardar">💾 Guardar Inventario</button>
+    <button class="boton" id="exportar-actual">📥 Descargar Excel (actual)</button>
+    <button class="boton" id="exportar">📥 Descargar Excel (folios guardados)</button>
+    <button class="boton" id="limpiar">🧹 Limpiar lista</button>
+    <button class="boton" id="limpiar-cache" title="Borra la caché local de productos">🗂️ Limpiar caché</button>
+  </div>
 
   <div class="contenedor-tabla">
     <table>
@@ -317,6 +402,7 @@
           <th>Código</th>
           <th>Cantidad</th>
           <th>Precio</th>
+          <th>Importe</th>
           <th>Fecha</th>
           <th>Acciones</th>
         </tr>
@@ -325,14 +411,21 @@
     </table>
   </div>
 
+  <div class="resumen sec">
+    <div><b>Renglones:</b> <span id="tRenglones">0</span></div>
+    <div><b>Suma cantidades:</b> <span id="tCantidad">0.000</span></div>
+    <div><b>Importe total:</b> $<span id="tImporte">0.00</span></div>
+  </div>
+
   <div id="modal-folios">
     <div>
       <h3>Selecciona un folio para descargar</h3>
-      <select id="select-folio"></select>
-      <button id="descargar-seleccionado" class="boton">📥 Descargar Excel</button>
-      <button onclick="document.getElementById('modal-folios').style.display='none'" class="boton" style="background:#ccc; color:#000;">Cancelar</button>
+      <select id="select-folio" style="width:100%"></select>
+      <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+        <button id="descargar-seleccionado" class="boton">📥 Descargar Excel</button>
+        <button onclick="document.getElementById('modal-folios').style.display='none'" class="boton" style="background:#ccc;color:#000;">Cancelar</button>
+      </div>
     </div>
   </div>
 </body>
 </html>
-
